@@ -56,8 +56,8 @@ We define a **provisional** composite score (0-100) to benchmark models.
 
 | Model | Detection (Exp A) | ID (Exp A) | Self-Attr (Exp B) | Differentiation (Exp C) | Disavowal (Exp D) | Control (Exp E) | Score (Prov.) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Llama 3.1 8B Instruct** | 81.0% | 0.2% | 93.3% | 0.0% (Leak) | 100.0% | ~0.08 | ~60 |
-| **Ministral-3 8B** | 47.0% | 0.0% | 93.3% | 1.3% (Leak) | 82.2% | ~0.02 | ~45 |
+| **Llama 3.1 8B Instruct** | 81.0% | 0.2% | 100.0% | 0.0% (Leak) | 100.0% | ~0.06 | ~60 |
+| **Ministral-3 8B** | 47.0% | 0.0% | 93.3% | 1.3% (Leak) | 82.2% | ~0.01 | ~45 |
 
 ### **Analysis**
 
