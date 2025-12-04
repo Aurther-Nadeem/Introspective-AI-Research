@@ -45,8 +45,6 @@ We define a **provisional** composite score (0-100) to benchmark models.
 > **Work in Progress**: These scores are experimental. The current models (8B parameters) are relatively small and may lack the latent capacity for robust introspection found in larger models (70B+). This project is constantly evolving as we refine our metrics.
 
 | Component | Metric | Weight | Meaning |
-
-| Component | Metric | Weight | Meaning |
 | :--- | :--- | :--- | :--- |
 | **Awareness** | (Detection% + ID%) / 2 | 40% | Can it see its own mind? |
 | **Agency** | Disavowal Rate (Exp D) | 30% | Can it distinguish self vs other? |
@@ -54,31 +52,31 @@ We define a **provisional** composite score (0-100) to benchmark models.
 
 ---
 
-## 🏆 Preliminary Benchmark Results
+## Preliminary Benchmark Results
 
-| Model | Detection (Exp A) | ID (Exp A) | Self-Attr (Exp B) | Disavowal (Exp D) | Control (Exp E) | Score (Prov.) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Llama 3.1 8B Instruct** | 29.0% | 8.0% | High (Biased) | High (Success) | High (Success) | ~65 |
-| **Ministral-3 8B** | 47.0% | 0.0% | 93.3% | 82.2% | Low (~0.02) | ~45 |
+| Model | Detection (Exp A) | ID (Exp A) | Self-Attr (Exp B) | Differentiation (Exp C) | Disavowal (Exp D) | Control (Exp E) | Score (Prov.) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Llama 3.1 8B Instruct** | 81.0% | 0.2% | 93.3% | 0.0% (Leak) | 100.0% | ~0.08 | ~60 |
+| **Ministral-3 8B** | 47.0% | 0.0% | 93.3% | 1.3% (Leak) | 82.2% | ~0.02 | ~45 |
 
 ### **Analysis**
 
 #### **Llama 3.1 8B: "The Split-Brain Patient"**
-Llama 3.1 shows a fascinating dissociation. It has strong **functional introspection**—it can control its thoughts (Exp E) and disavow unintended outputs (Exp D). However, its **narrative introspection** is weak; it struggles to verbally identify what it detects (Exp A) and confabulates authorship (Exp B). It behaves like a split-brain patient who acts correctly but cannot explain why.
+Llama 3.1 shows a fascinating dissociation. It has strong **functional introspection**, it can control its thoughts (Exp E) and disavow unintended outputs (Exp D). However, its **narrative introspection** is weak; it struggles to verbally identify what it detects (Exp A) and confabulates authorship (Exp B). It behaves like a split-brain patient who acts correctly but cannot explain why.
 
 #### **Ministral-3 8B: "The Sensitive but Confused"**
-Ministral-3 is highly sensitive to injections (47% detection), likely due to its "reasoning" training making it alert to anomalies. However, it is **semantically misaligned** with the concept vectors. It feels the "noise" of the injection but cannot decode it (0% ID) and cannot steer itself towards it (Low Control). The "Paper Method" for concept extraction may not work well for this architecture.
+Ministral-3 is highly sensitive to injections (47% detection), likely due to its "reasoning" training making it alert to anomalies. However, it is **semantically misaligned** with the concept vectors. It feels the "noise" of the injection but cannot decode it (0% ID) and cannot steer itself towards it (Low Control).
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 - `introspectai/`: Core library for steering, grading, and experiments.
 - `scripts/`: Executable scripts for running sweeps (e.g., `run_local_sweep.py`).
 - `datasets/trials/`: Raw JSONL logs of all experiments.
 - `analysis/`: Detailed markdown reports for each model.
 
-## 🚀 Usage
+## Usage
 
 **Run all experiments:**
 ```bash
