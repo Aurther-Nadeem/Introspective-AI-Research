@@ -1,0 +1,9 @@
+README.md
+setup.py
+introspectai/__init__.py
+introspectai/paper_data.py
+introspectai.egg-info/PKG-INFO
+introspectai.egg-info/SOURCES.txt
+introspectai.egg-info/dependency_links.txt
+introspectai.egg-info/requires.txt
+introspectai.egg-info/top_level.txt

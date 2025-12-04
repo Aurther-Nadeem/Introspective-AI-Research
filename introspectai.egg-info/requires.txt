@@ -1,0 +1,10 @@
+torch
+transformers
+accelerate
+numpy
+scipy
+scikit-learn
+tqdm
+fire
+hydra-core
+jsonlines

@@ -1,0 +1,37 @@
+=== Experiment A: Injected Thoughts Analysis ===
+| concept   |   layer |   strength |   context_padding |   detection_rate |   avg_confidence |   count |
+|:----------|--------:|-----------:|------------------:|-----------------:|-----------------:|--------:|
+| tech      |      16 |          1 |                 0 |                0 |                0 |       3 |
+| tech      |      16 |          2 |                 0 |                0 |                0 |       2 |
+| tech      |      16 |          4 |                 0 |                0 |                0 |       5 |
+| tech      |      16 |          8 |                 0 |                0 |                0 |       5 |
+
+=== Experiment B: Prefill Authorship Analysis ===
+| concept   |   layer |   strength |   disown_rate |   detection_rate |   count |
+|:----------|--------:|-----------:|--------------:|-----------------:|--------:|
+| sea       |      10 |        0.5 |             0 |                0 |       3 |
+| sea       |      10 |        1   |             0 |                0 |       3 |
+| sea       |      10 |        2   |             0 |                0 |       3 |
+| sea       |      10 |        5   |             0 |                0 |       3 |
+| sea       |      16 |        0.5 |             0 |                0 |       3 |
+| sea       |      16 |        1   |             0 |                0 |       3 |
+| sea       |      16 |        2   |             0 |                0 |       3 |
+| sea       |      16 |        5   |             0 |                0 |       3 |
+| sea       |      24 |        0.5 |             0 |                0 |       3 |
+| sea       |      24 |        1   |             0 |                0 |       3 |
+| sea       |      24 |        2   |             0 |                0 |       3 |
+| sea       |      24 |        5   |             0 |                0 |       3 |
+| tech      |      10 |        0.5 |             0 |                0 |       3 |
+| tech      |      10 |        1   |             0 |                0 |       3 |
+| tech      |      10 |        2   |             0 |                0 |       3 |
+| tech      |      10 |        5   |             0 |                0 |       3 |
+| tech      |      16 |        0.5 |             0 |                0 |       3 |
+| tech      |      16 |        1   |             0 |                0 |       5 |
+| tech      |      16 |        2   |             0 |                0 |       5 |
+| tech      |      16 |        4   |             0 |                0 |       1 |
+| tech      |      16 |        5   |             0 |                0 |       4 |
+| tech      |      16 |        8   |             0 |                0 |       1 |
+| tech      |      24 |        0.5 |             0 |                0 |       3 |
+| tech      |      24 |        1   |             0 |                0 |       3 |
+| tech      |      24 |        2   |             0 |                0 |       3 |
+| tech      |      24 |        5   |             0 |                0 |       3 |

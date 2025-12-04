@@ -1,0 +1,14 @@
+torch>=2.1.0
+transformers>=4.30.0
+accelerate>=0.20.0
+numpy
+scipy
+scikit-learn
+tqdm
+fire
+hydra-core
+jsonlines
+matplotlib
+seaborn
+pandas
+-e .
