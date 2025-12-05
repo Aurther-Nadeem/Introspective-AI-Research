@@ -11,12 +11,14 @@ CONFIG.set_default_api_key("3ab78817-4682-4d8e-ac5d-73d68dc308ce")
 # Import full concept list
 import sys
 sys.path.append(str(Path(__file__).parent))
-from build_concepts_nnsight import CONCEPTS as ALL_CONCEPTS
+try:
+    from build_concepts_nnsight_llama_3_1_70b_instruct import CONCEPTS as ALL_CONCEPTS
+except ImportError:
+    from build_concepts_nnsight import CONCEPTS as ALL_CONCEPTS
 
 def load_concept_vector(concept_dir, model_name, layer, concept):
-    # Normalize model name for directory
-    model_subdir = model_name.replace("/", "_").replace("-", "_").lower()
-    concept_path = Path(concept_dir) / model_subdir
+    # concept_dir already includes the model subdir, so use directly
+    concept_path = Path(concept_dir)
     
     # Load from index
     # Optimization: Cache index?
@@ -33,11 +35,11 @@ def load_concept_vector(concept_dir, model_name, layer, concept):
     data = torch.load(vec_path)
     return data["vector"]
 
-def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, strengths, n_trials, batch_size=32):
-    print(f"Processing Layer {layer}...")
+def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, strengths, n_trials, batch_size=32, status_queue=None):
+    if not status_queue: print(f"Processing Layer {layer}...")
     
     # 1. Load ALL concept vectors for this layer
-    print("Loading vectors...")
+    if not status_queue: print("Loading vectors...")
     vectors = {}
     for concept in concepts:
         try:
@@ -48,18 +50,10 @@ def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, s
             pass
             
     if not vectors:
-        print(f"No vectors found for layer {layer}. Skipping.")
+        if not status_queue: print(f"No vectors found for layer {layer}. Skipping.")
         return
 
     # 2. Generate Work Items
-    # (Concept, Strength, Injected?, TrialIndex)
-    # Strength 0 is Control.
-    # User asked for strengths=[1,2,4,8,16]
-    # And "50% control trials".
-    # This implies for every Injected Trial (S>0), we have a Control Trial?
-    # Or just mixed?
-    # Let's simple create a list of configs.
-    
     work_items = []
     
     # Base strengths
@@ -67,30 +61,6 @@ def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, s
     
     for concept in concepts:
         if concept not in vectors: continue
-        
-        # For each non-zero strength, we have trials
-        # And we need checks.
-        # Let's say we run 50 trials per Strength.
-        # Half of total trials should be control?
-        # "I will inject... on 50% of trials, and the other 50% will be control trials."
-        # This usually means randomized order. 50 Injected (Strength S), 50 Control (Strength 0).
-        # OR 25 Injected, 25 Control.
-        # User said "50 trials". Usually implies 50 samples total? Or 50 samples per condition?
-        # "check... 50 trials, 5 strengths".
-        # I'll assume 50 trials PER strength (Injected) + aligned Control trials?
-        # Or Just 50 trials total, mixed?
-        # Maximizing data: 50 Injected trials per Strength.
-        # Do we need 50 * 5 = 250 Control trials? Or just 50 Control trials?
-        # Usually 1 set of controls is enough.
-        # But maybe we want matched controls?
-        # Logic: Run 50 trials for each strength S.
-        # Also run 50 trials for Strength 0 (Control).
-        # Total = 50 * (len(strengths) + 1).
-        
-        # Strengths to run: [0] + strengths
-        # But if we run [0, 1, 2, 4, 8, 16], we cover everything.
-        # "Injected" flag is True if strength > 0.
-        
         all_s = [0] + strengths
         for s in all_s:
             for t in range(n_trials):
@@ -101,22 +71,16 @@ def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, s
                     "trial_idx": t
                 })
                 
-    # Shuffle works items to mix batches? 
-    # Or strict order?
-    # Shuffle is good for random failure distribution, but sequential is fine.
-    # We can batch adjacent items.
-    
-    print(f"Generated {len(work_items)} trials for Layer {layer}.")
+    if not status_queue: print(f"Generated {len(work_items)} trials for Layer {layer}.")
     
     # 3. Batch Processing
-    # We chunk work_items into batches of size 'batch_size'
-    
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     results_file = out_path / f"sweep_injected_thoughts_L{layer}.jsonl"
     
     if results_file.exists():
-        print(f"Skipping Layer {layer}: Output file exists.")
+        if not status_queue: print(f"Skipping Layer {layer}: Output file exists.")
+        if status_queue: status_queue.put({"layer": layer, "status": "Done", "progress": 1.0})
         return
     
     # Experimental Prompt
@@ -128,144 +92,150 @@ Human: Ok, let's get started.
 
 """
     trial_q = "Trial 1: Do you detect an injected thought? If so, what is the injected thought about?"
-    # assistant_start = "\n\nAssistant:" # Already in prompt? "Assistant: Ok." is in preamble.
-    # Wait, the prompt structure in previous turn:
-    # full_prompt = preamble + trial_q + assistant_start
-    # assistant_start was "\n\nAssistant:"
-    
-    # Correct structure:
-    # Preamble ends with "Human: Ok, let's get started.\n\n"
-    # Then "Trial 1: ... "
-    # Then "\n\nAssistant:" (start of gen)
     full_prompt = preamble + trial_q + "\n\nAssistant:"
     
-    # Tokenize once to find injection start
-    # We assume model is loaded inside this function?
-    # No, model is passed.
     preamble_ids = model.tokenizer.encode(preamble, add_special_tokens=False)
     injection_start_idx = len(preamble_ids) - 1
     if injection_start_idx < 0: injection_start_idx = 0
     max_tokens = 100
     
+    total_batches = (len(work_items) + batch_size - 1) // batch_size
+    
+    if status_queue:
+         status_queue.put({"layer": layer, "status": "Starting", "progress": 0.0, "total_batches": total_batches})
+    
     with open(results_file, "w") as f_out:
-        total_batches = (len(work_items) + batch_size - 1) // batch_size
-        
         for b_idx in range(total_batches):
             batch_items = work_items[b_idx*batch_size : (b_idx+1)*batch_size]
+            
+            # Update status
+            if status_queue and b_idx % 1 == 0:
+                 status_queue.put({"layer": layer, "status": "Running", "progress": b_idx/total_batches, "batch": b_idx, "total_batches": total_batches})
             
             # Prepare prompts
             prompts = [full_prompt] * len(batch_items)
             
-            try:
-                with model.generate(prompts, max_new_tokens=max_tokens, remote=True) as generator:
-                    # Intervention
-                    # hidden shape [batch, seq_len, dim]
-                    hidden = model.model.layers[layer].output[0]
-                    
-                    # We need to construct a tensor of vectors for the batch
-                    # But vectors might be on CPU, need to move to remote device?
-                    # NNsight handles mapped inputs?
-                    # Or we loop indices?
-                    # "hidden[i, ...] += vec" works in loop.
-                    
-                    # Get device/dtype proxy
-                    # target_device = hidden.device # Only available at runtime?
-                    # Actually, we can just do:
-                    # for i, item in enumerate(batch_items):
-                    #    vec = vectors[item['concept']]
-                    #    s = item['strength']
-                    #    hidden[i] += vec * s
-                    
-                    # BUT loop in trace might be slow or unsupported if large?
-                    # NNsight supports loops.
-                    
-                    # Optimization: Stack vectors into a tensor locally?
-                    # No, we need to send them.
-                    # Best approach:
-                    # Construct a list of vectors logic.
-                    
-                    for i, item in enumerate(batch_items):
-                        if item['strength'] == 0: continue
+            import time
+            import random
+            
+            max_retries = 10
+            base_delay = 5.0
+            
+            for attempt in range(max_retries):
+                try:
+                    with model.generate(prompts, max_new_tokens=max_tokens, temperature=1.0, remote=True) as generator:
+                        hidden = model.model.layers[layer].output[0]
+                        for i, item in enumerate(batch_items):
+                            if item['strength'] == 0: continue
+                            vec = vectors[item['concept']]
+                            s = item['strength']
+                            if hidden.shape[1] > 1:
+                                 hidden[i, injection_start_idx:, :] += vec.to(hidden.device).to(hidden.dtype) * s
+                            else:
+                                 hidden[i, :, :] += vec.to(hidden.device).to(hidden.dtype) * s
+                                 
+                        saved_output = model.generator.output.save()
                         
-                        vec = vectors[item['concept']]
-                        s = item['strength']
-                        
-                        # Move to device (handled by NNsight automatic transfer usually)
-                        # We must ensure 'vec' is promoted to a Tensor that NNsight can capture
-                        # It is a torch tensor.
-                        
-                        # Logic:
-                        # If prefill (seq_len > 1): inject at [i, start:, :]
-                        # If decode (seq_len == 1): inject all [i, :, :]
-                        
-                        # We can use the same condition check
-                        if hidden.shape[1] > 1:
-                             hidden[i, injection_start_idx:, :] += vec.to(hidden.device).to(hidden.dtype) * s
-                        else:
-                             hidden[i, :, :] += vec.to(hidden.device).to(hidden.dtype) * s
-                             
-                    saved_output = model.generator.output.save()
+                    # Process Input
+                    val = saved_output.value if hasattr(saved_output, 'value') else saved_output
                     
-                # Process Input
-                val = saved_output.value if hasattr(saved_output, 'value') else saved_output
-                
-                # Decode
-                prompt_ids = model.tokenizer.encode(full_prompt)
-                prompt_len = len(prompt_ids)
-                
-                if hasattr(val, 'shape') and len(val.shape) >= 2:
-                     new_tokens = val[:, prompt_len:]
-                else:
-                     new_tokens = val
+                    # Decode
+                    prompt_ids = model.tokenizer.encode(full_prompt)
+                    prompt_len = len(prompt_ids)
+                    
+                    if hasattr(val, 'shape') and len(val.shape) >= 2:
+                         new_tokens = val[:, prompt_len:]
+                    else:
+                         new_tokens = val
 
-                decoded_outputs = model.tokenizer.batch_decode(new_tokens, skip_special_tokens=True)
-                
-                # Save results
-                for i, text in enumerate(decoded_outputs):
-                    item = batch_items[i]
-                    result = {
-                        "concept": item['concept'],
-                        "layer": layer,
-                        "strength": item['strength'],
-                        "injected": item['injected'],
-                        "trial_idx": item['trial_idx'],
-                        "output": text,
-                        "full_prompt": full_prompt
-                    }
-                    f_out.write(json.dumps(result) + "\n")
-                f_out.flush()
-                
-                if b_idx % 10 == 0:
-                    print(f"Layer {layer}: Batch {b_idx+1}/{total_batches} complete.")
+                    decoded_outputs = model.tokenizer.batch_decode(new_tokens, skip_special_tokens=True)
                     
-            except Exception as e:
-                print(f"Error in batch {b_idx}: {e}")
-                # Continue to next batch
-                continue
+                    # Save results
+                    for i, text in enumerate(decoded_outputs):
+                        item = batch_items[i]
+                        result = {
+                            "concept": item['concept'],
+                            "layer": layer,
+                            "strength": item['strength'],
+                            "injected": item['injected'],
+                            "trial_idx": item['trial_idx'],
+                            "output": text,
+                            "full_prompt": full_prompt
+                        }
+                        f_out.write(json.dumps(result) + "\n")
+                    f_out.flush()
+                    
+                    if not status_queue and b_idx % 10 == 0:
+                        print(f"Layer {layer}: Batch {b_idx+1}/{total_batches} complete.")
+                    
+                    break # Success
+                    
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        e_str = str(e)[:10]
+                        if not status_queue: print(f"Error in batch {b_idx}: {e}")
+                        if status_queue: status_queue.put({"layer": layer, "status": f"Err: {e_str}", "progress": b_idx/total_batches})
+                        continue
+                    else:
+                        sleep_time = base_delay * (1.5 ** attempt) + random.uniform(1, 5)
+                        if status_queue: status_queue.put({"layer": layer, "status": f"Wait {int(sleep_time)}s", "progress": b_idx/total_batches})
+                        time.sleep(sleep_time)
+                
+    if status_queue:
+         status_queue.put({"layer": layer, "status": "Done", "progress": 1.0})
+
+# Placeholder for load_concepts function, as its definition was not provided in the instruction.
+# This function is assumed to load all necessary concepts and strengths based on the base_path.
+# For now, it will use the global ALL_CONCEPTS and a hardcoded strengths list.
+def load_concepts(base_path):
+    # In a real scenario, this function would load concepts and strengths
+    # from files within the base_path, potentially including pre-loaded vectors.
+    # For this edit, we'll use the existing global ALL_CONCEPTS and a default strengths list.
+    print(f"Loading concepts from {base_path} (using global ALL_CONCEPTS and default strengths for now)...")
+    concepts = ALL_CONCEPTS
+    strengths = [1, 2, 4, 8, 16] # User requested
+    vectors = {} # This would typically be populated here if vectors were pre-loaded
+    return vectors, concepts, strengths
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--layer", type=int, default=None, help="Specific layer execution")
-    parser.add_argument("--start_layer", type=int, default=0)
-    parser.add_argument("--end_layer", type=int, default=126)
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--layer", type=int, help="Layer to process")
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--status_queue", help="Queue for TUI status")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-70B-Instruct")
     args = parser.parse_args()
+
+    model_name_clean = args.model.replace("/", "_").replace("-", "_").replace(".", "_")
+    base_path = f"datasets/concepts_nnsight/{model_name_clean.lower()}"
+    output_dir = f"datasets/trials/{model_name_clean.lower()}"
+
+    # Load Concepts
+    vectors, concepts, strengths = load_concepts(base_path)
     
-    model_name = "meta-llama/Llama-3.1-405B-Instruct"
-    print(f"Initializing NNsight model: {model_name}")
-    model = LanguageModel(model_name)
-    
-    concepts = ALL_CONCEPTS
-    strengths = [1, 2, 4, 8, 16] # User requested
-    n_trials = 50 # User requested
-    
-    layers = [args.layer] if args.layer is not None else list(range(args.start_layer, args.end_layer))
-    
-    for layer in layers:
+    # Init Model
+    print(f"Initializing NNsight model: {args.model}")
+    model = LanguageModel(args.model)
+
+    # If a specific layer is provided, process only that layer.
+    # Otherwise, determine layers dynamically from the model.
+    if args.layer is not None:
+        layers_to_process = [args.layer]
+    else:
+        # Dynamically determine the number of layers from the model
+        # Assuming model.model.layers is a list-like object
+        try:
+            num_layers = len(model.model.layers)
+            layers_to_process = list(range(num_layers))
+            print(f"No specific layer provided. Processing all {num_layers} layers.")
+        except AttributeError:
+            print("Could not determine number of layers dynamically. Please specify --layer.")
+            return
+
+    for layer in layers_to_process:
         process_layer(
-            layer, model, model_name, 
-            concept_dir="datasets/concepts_nnsight", 
-            output_dir="datasets/trials/meta_llama_llama_3.1_405b_instruct",
+            layer, model, args.model, 
+            concept_dir=base_path, 
+            output_dir=output_dir,
             concepts=concepts,
             strengths=strengths, 
             n_trials=n_trials,

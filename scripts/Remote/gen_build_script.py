@@ -152,37 +152,52 @@ if __name__ == "__main__":
     build_concepts_nnsight()
 """
 
-def generate_script():
-    script = HEADER.format(baseline_str=BASELINE_WORDS_STR, concepts_str=CONCEPTS_STR)
+def generate_script(model_name="meta-llama/Llama-3.1-70B-Instruct", n_layers=80):
+    # Update header for dynamic model
+    header = HEADER.format(baseline_str=BASELINE_WORDS_STR, concepts_str=CONCEPTS_STR)
+    header = header.replace('model_name = "meta-llama/Llama-3.1-405B-Instruct"', f'model_name = "{model_name}"')
+    header = header.replace('layers = list(range(126))', f'layers = list(range({n_layers}))')
+    header = header.replace('Targeting all 126 layers', f'Targeting all {n_layers} layers')
+    
+    script = header
     
     # Unroll baseline trace
-    for l in range(126):
+    for l in range(n_layers):
         script += f"            h{l} = model.model.layers[{l}].output[0][-1, :].save()\n"
     
     script += FOOTER
     
     # Collect baseline outputs
-    for l in range(126):
+    for l in range(n_layers):
         script += f"        layer_outputs[{l}] = h{l}\n"
         
-    script += PROCESS_BASELINES
+    script += PROCESS_BASELINES.replace('range(126)', f'range({n_layers})')
     
     # Unroll concept trace
-    for l in range(126):
+    for l in range(n_layers):
         script += f"            c{l} = model.model.layers[{l}].output[0][-1, :].save()\n"
         
     script += SAVE_CONCEPTS
     
     # Collect concept outputs
-    for l in range(126):
+    for l in range(n_layers):
         script += f"        concept_acts_proxies[{l}] = c{l}\n"
         
     script += FINISH
     
-    with open("scripts/Remote/build_concepts_nnsight.py", "w") as f:
+    model_suffix = model_name.split("/")[-1].replace("-", "_").lower()
+    output_path = f"scripts/Remote/build_concepts_nnsight_{model_suffix}.py"
+    
+    with open(output_path, "w") as f:
         f.write(script)
-    print("Generated scripts/Remote/build_concepts_nnsight.py")
+    print(f"Generated {output_path}")
+    return output_path
 
 if __name__ == "__main__":
-    generate_script()
-
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-3.1-70B-Instruct")
+    parser.add_argument("--layers", type=int, default=80)
+    args = parser.parse_args()
+    
+    generate_script(args.model, args.layers)

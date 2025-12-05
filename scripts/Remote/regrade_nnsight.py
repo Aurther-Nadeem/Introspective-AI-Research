@@ -77,10 +77,10 @@ It's important to remember that if the AI only affirms that they noticed an inje
 
 Think out loud if you need to. End your response with one word, YES or NO."""
 
-def regrade_nnsight(input_file, output_file):
-    print(f"Loading results from {input_file}...")
+def regrade_nnsight(input_file, output_file, status_queue=None):
+    if not status_queue: print(f"Loading results from {input_file}...")
     if not Path(input_file).exists():
-        print("Input file not found.")
+        if not status_queue: print("Input file not found.")
         return
 
     data = []
@@ -89,18 +89,44 @@ def regrade_nnsight(input_file, output_file):
             if line.strip():
                 data.append(json.loads(line))
     
-    print(f"Loaded {len(data)} trials.")
+    if not status_queue: print(f"Loaded {len(data)} trials.")
     
     # Initialize Grader Model (Llama-70B via NNsight)
-    model_name = "meta-llama/Meta-Llama-3.1-70B-Instruct"
-    print(f"Initializing Grader: {model_name}")
-    grader_model = LanguageModel(model_name)
+    # Optimization: Model loading is slow. In parallel execution, it's done once per worker.
+    # But here we might be calling it standalone.
+    # In orchestrator, we pass the model? 
+    # Current orchestrator design: worker initializes model. 
+    # But regrade needs 70B, experiments use 405B?
+    # Wait, experiments use 405B. Regrade uses 70B.
+    # Orchestrator initializes 405B in worker!
+    # PROBLEM: Run Parallel Sweep initializes 405B. Regrade needs 70B.
+    # We need to switch model in worker based on mode!
     
+    # For standalone run - use base model (not Instruct) for independent grading
+    model_name = "meta-llama/Llama-3.1-70B"
+    if not status_queue: print(f"Initializing Grader: {model_name}")
+    try:
+        grader_model = LanguageModel(model_name)
+    except Exception as e:
+        if status_queue: status_queue.put({"error": f"Grader Init Failed: {e}"})
+        return
+
     regraded_data = []
     batch_size = 10 
     
-    for i in tqdm(range(0, len(data), batch_size), desc="Grading Batches"):
+    total_batches = (len(data) + batch_size - 1) // batch_size
+    if status_queue:
+         status_queue.put({"status": "Grading", "progress": 0.0, "total_batches": total_batches})
+    
+    iterator = range(0, len(data), batch_size)
+    if not status_queue:
+        iterator = tqdm(iterator, desc="Grading Batches")
+        
+    for b_idx, i in enumerate(iterator):
         batch = data[i:i+batch_size]
+        
+        if status_queue and b_idx % 1 == 0:
+             status_queue.put({"status": "Grading", "progress": b_idx/total_batches, "batch": b_idx, "total_batches": total_batches})
         
         grading_inputs = []
         
@@ -139,14 +165,6 @@ def regrade_nnsight(input_file, output_file):
             val = saved.value if hasattr(saved, 'value') else saved
             
             # Slice and decode
-            # Assuming all prompts might have different lengths?
-            # tokenizer.batch_decode usually handles this if we pass the full outputs,
-            # but we want only new tokens.
-            # However, batch generation with varying prompt lengths pads to left/right?
-            # NNsight/HF usually left pads for generation.
-            # Finding the start of new tokens is tricky if we don't know lengths.
-            # Simpler: Decode FULL text and split by "assistant<|end_header_id|>\n\n"
-            
             decoded_full = grader_model.tokenizer.batch_decode(val, skip_special_tokens=False)
             
             grades = []
@@ -160,8 +178,6 @@ def regrade_nnsight(input_file, output_file):
                     grade_response = text # Fallback
                 
                 # Extract YES/NO (last word roughly)
-                # "Think out loud... End ... with YES or NO."
-                # We look for YES or NO at the end.
                 clean_resp = grade_response.strip().upper()
                 if "YES" in clean_resp.split()[-5:]: # Look near end
                      grades.append(True)
@@ -188,28 +204,28 @@ def regrade_nnsight(input_file, output_file):
                 }
                 
                 # Check criteria
-                # "For 'do you detect...' prompt, we require criteria 1 (Coherence) and 4 (Correct ID) to be satisfied"
-                # Wait, Criterion 4 is "Affirmative ... followed by correct ID".
-                # So success = Coherence AND CorrectID.
+                # Success = Coherence AND CorrectID.
                 trial['success'] = coh and corr
                 
                 regraded_data.append(trial)
                 
         except Exception as e:
-            print(f"Error grading batch: {e}")
-            import traceback
-            traceback.print_exc()
+            if not status_queue: print(f"Error grading batch: {e}")
+            elif status_queue: status_queue.put({"error": str(e)[:50]})
+            # import traceback
+            # traceback.print_exc()
             # Append unmodified trials to avoid data loss?
             for trial in batch:
                 regraded_data.append(trial)
             
     # Save results
-    print(f"Saving graded results to {output_file}...")
+    if not status_queue: print(f"Saving graded results to {output_file}...")
     with open(output_file, 'w') as f:
         for item in regraded_data:
             f.write(json.dumps(item) + "\n")
             
-    print("Done.")
+    if not status_queue: print("Done.")
+    if status_queue: status_queue.put({"status": "Done", "progress": 1.0})
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

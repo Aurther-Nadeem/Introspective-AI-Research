@@ -134,14 +134,33 @@ import argparse
 
 def analyze_injected_thoughts(file_path):
     print(f"\n--- Analyzing Injected Thoughts (Exp A): {file_path} ---")
-    if not Path(file_path).exists():
-        print("File not found.")
+    data = []
+    
+    # Support sharded loading
+    p = Path(file_path)
+    if p.exists():
+        files = [p]
+    else:
+        # Check for shards: name_L*.jsonl
+        # e.g. sweep_injected_thoughts.jsonl -> sweep_injected_thoughts_L*.jsonl
+        stem = p.stem
+        # If stem ends with .jsonl (it shouldn't, stem is filename without suffix)
+        # file_path is .../sweep_injected_thoughts.jsonl
+        # we want .../sweep_injected_thoughts_L*.jsonl
+        parent = p.parent
+        pattern = f"{stem}_L*.jsonl"
+        files = list(parent.glob(pattern))
+        
+    if not files:
+        print(f"File not found: {file_path} (checked shards too)")
         return
 
-    data = []
-    with open(file_path, 'r') as f:
-        for line in f:
-            data.append(json.loads(line))
+    print(f"Loading {len(files)} files...")
+    for f_path in files:
+        with open(f_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    data.append(json.loads(line))
             
     df = pd.DataFrame(data)
     if df.empty:
