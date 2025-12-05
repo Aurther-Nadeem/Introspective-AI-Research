@@ -78,9 +78,8 @@ def load_model(model_name_or_path, dtype="bfloat16", device_map="auto"):
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
-            torch_dtype=torch_dtype,
-            device_map=device_map,
-            **kwargs
+            torch_dtype=torch.float16,
+            device_map="auto"
         )
     model.eval()
     

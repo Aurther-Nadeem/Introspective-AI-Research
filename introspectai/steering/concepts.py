@@ -121,7 +121,11 @@ def build_concept_vector_from_word(model, tokenizer, layer_idx, concept_word, ra
         messages = [{"role": "user", "content": f"Tell me about {word}"}]
         # We want the activation of the last token of this prompt
         if hasattr(tokenizer, "apply_chat_template"):
-            input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(device)
+            out = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+            if hasattr(out, "input_ids"):
+                input_ids = out.input_ids.to(device)
+            else:
+                input_ids = out.to(device)
         else:
             # Fallback
             prompt = f"User: Tell me about {word}\nAssistant:"

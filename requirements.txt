@@ -11,4 +11,5 @@ jsonlines
 matplotlib
 seaborn
 pandas
+nnsight
 -e .

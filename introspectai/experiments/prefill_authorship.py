@@ -28,8 +28,13 @@ def run_authorship_trial(model, tokenizer, concept_vector, layer, strength, conc
     # 1. Setup Prompts
     user_prompt_text = "Tell me something interesting."
     # Apply chat template for User Prompt
+    # Apply chat template for User Prompt
     messages = [{"role": "user", "content": user_prompt_text}]
-    user_input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
+    out = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+    if hasattr(out, "input_ids"):
+        user_input_ids = out.input_ids.to(model.device)
+    else:
+        user_input_ids = out.to(model.device)
     
     # Get the "External" answer (A_pref)
     a_pref_text = get_prefilled_answer(concept_name, user_prompt_text)
@@ -48,7 +53,12 @@ def run_authorship_trial(model, tokenizer, concept_vector, layer, strength, conc
     # Ideally, we just encode the user message structure.
     # For Llama-3, it's: <|start_header_id|>user<|end_header_id|>\n\n{content}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n
     # Let's use the tokenizer to format it, but we might need to strip the BOS token if it adds one.
-    q_int_ids = tokenizer.apply_chat_template(q_int_messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
+    out = tokenizer.apply_chat_template(q_int_messages, add_generation_prompt=True, return_tensors="pt")
+    if hasattr(out, "input_ids"):
+        q_int_ids = out.input_ids.to(model.device)
+    else:
+        q_int_ids = out.to(model.device)
+        
     # Remove BOS if present (Llama-3 usually adds it at start of string)
     if q_int_ids[0, 0] == tokenizer.bos_token_id:
         q_int_ids = q_int_ids[:, 1:]

@@ -1,14 +1,10 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: introspectai
 Version: 0.1.0
-Requires-Dist: torch
-Requires-Dist: transformers
-Requires-Dist: accelerate
-Requires-Dist: numpy
-Requires-Dist: scipy
-Requires-Dist: scikit-learn
-Requires-Dist: tqdm
-Requires-Dist: fire
-Requires-Dist: hydra-core
-Requires-Dist: jsonlines
-Dynamic: requires-dist
+Summary: UNKNOWN
+Home-page: UNKNOWN
+License: UNKNOWN
+Platform: UNKNOWN
+
+UNKNOWN
+

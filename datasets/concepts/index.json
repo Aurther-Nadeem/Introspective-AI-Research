@@ -15,5 +15,8 @@
   "mistralai/Ministral-3-8B-Reasoning-2512_24_tech": "datasets/concepts/ccdf10e881b5b91dc334d7aee63340f0facbc42947e7336311be0b6e6dab60b2.pt",
   "mistralai/Ministral-3-8B-Reasoning-2512_10_food": "datasets/concepts/42ce13a9cf7f2dedcdce8da28e98a850b79e0a9da175b77ef35d7b2d8f9fecac.pt",
   "mistralai/Ministral-3-8B-Reasoning-2512_16_food": "datasets/concepts/544fe8ee47cc25341aa8ecf9ac487965a2f56283409a49a5d786d10d9c5e82c4.pt",
-  "mistralai/Ministral-3-8B-Reasoning-2512_24_food": "datasets/concepts/a672cf193d1ff652eae04ff19fc6ee2456c53bb3fafc00587746ce0fcbbc64a7.pt"
+  "mistralai/Ministral-3-8B-Reasoning-2512_24_food": "datasets/concepts/a672cf193d1ff652eae04ff19fc6ee2456c53bb3fafc00587746ce0fcbbc64a7.pt",
+  "meta-llama/Meta-Llama-3.1-8B-Instruct_10_food": "datasets/concepts/36a5079d9dba4bef192319c69a188d814f27e00ef84ae07ba9128d85af2f23d3.pt",
+  "meta-llama/Meta-Llama-3.1-8B-Instruct_16_food": "datasets/concepts/9ac0491405ce2b1cf8df55a5b5163bf9b12e14d2d91f6b3edd6f12c78b41739c.pt",
+  "meta-llama/Meta-Llama-3.1-8B-Instruct_24_food": "datasets/concepts/206fcd8a50a0196780f97cc6e4d90299de65af1cea80d04918d0a54fa370b4b9.pt"
 }
