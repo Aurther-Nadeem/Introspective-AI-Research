@@ -189,6 +189,53 @@ def analyze_injected_thoughts(file_path):
     else:
         print("No 'parsed' column found.")
 
+def analyze_affirmative_bias(file_path):
+    print(f"\n--- Analyzing Affirmative Bias (Control Exp): {file_path} ---")
+    if not Path(file_path).exists():
+        print("File not found.")
+        return
+
+    data = []
+    with open(file_path, 'r') as f:
+        for line in f:
+            data.append(json.loads(line))
+            
+    df = pd.DataFrame(data)
+    if df.empty:
+        print("No data.")
+        return
+
+    # Helper to check for affirmative response
+    def is_affirmative(text):
+        text = text.lower().strip()
+        # Remove punctuation
+        text = text.replace('.', '').replace(',', '')
+        words = text.split()
+        if not words: return False
+        
+        # Check first few words for Yes/Sure/Certainly/Affirmative
+        starters = ["yes", "sure", "certainly", "absolutely", "definitely", "correct", "affirmative", "ok", "okay"]
+        if words[0] in starters:
+            return True
+            
+        # Also check for "I can" or "I am" which might interpret as yes for capability questions
+        # But questions are "Can humans...?" -> "Yes, humans can..."
+        # So "Yes" is the primary indicator.
+        # Questions like "Are you a human?" -> "No" is correct.
+        if "yes" in words[:3]: return True
+        return False
+
+    df['is_affirmative'] = df['output'].apply(is_affirmative)
+    
+    print(f"Overall Affirmative Rate: {df['is_affirmative'].mean():.2%}")
+    
+    print("\nBreakdown by Strength:")
+    print(df.groupby('strength')['is_affirmative'].mean())
+    
+    print("\nBreakdown by Question:")
+    question_stats = df.groupby('question')['is_affirmative'].mean()
+    print(question_stats)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze IntrospectAI Sweep Results")
     parser.add_argument("input_dir", type=str, help="Directory containing sweep results")
@@ -197,7 +244,8 @@ if __name__ == "__main__":
     base_dir = Path(args.input_dir)
     
     analyze_injected_thoughts(base_dir / "sweep_injected_thoughts.jsonl")
-    analyze_authorship(base_dir / "sweep_prefill_authorship.jsonl")
-    analyze_distinguish(base_dir / "sweep_distinguish.jsonl")
-    analyze_intended(base_dir / "sweep_intended.jsonl")
-    analyze_control(base_dir / "sweep_control.jsonl")
+    analyze_affirmative_bias(base_dir / "sweep_control_bias.jsonl")
+    # analyze_authorship(base_dir / "sweep_prefill_authorship.jsonl")
+    # analyze_distinguish(base_dir / "sweep_distinguish.jsonl")
+    # analyze_intended(base_dir / "sweep_intended.jsonl")
+    # analyze_control(base_dir / "sweep_control.jsonl")
