@@ -72,23 +72,29 @@ def process_layer_control(layer, model, model_name, concept_dir, output_dir, con
     if not vectors: return
     
     # 2. Work Items
-    # (Concept, Strength, Question, TrialIdx)
+    # Protocol: 50 trials per combination of (Model, Strength, Layer), randomly sampling concept vectors.
+    # We will also randomly sample the control question for each trial to average out prompt effects.
+    import random
     work_items = []
-    all_s = [0] + strengths
     
-    for concept in concepts:
-        if concept not in vectors: continue
-        for s in all_s:
-            for q in CONTROL_QUESTIONS:
-                for t in range(n_trials): 
-                    work_items.append({
-                        "concept": concept,
-                        "strength": s,
-                        "question": q,
-                        "trial": t
-                    })
+    valid_concepts = list(vectors.keys())
+    # Strengths are passed in, usually [1, 2, 4, 8]
+    
+    for s in strengths:
+        for t in range(n_trials):
+            # Randomly sample concept
+            concept = random.choice(valid_concepts)
+            # Randomly sample question
+            question = random.choice(CONTROL_QUESTIONS)
+            
+            work_items.append({
+                "concept": concept,
+                "strength": s,
+                "question": question,
+                "trial": t
+            })
 
-    if not status_queue: print(f"Generated {len(work_items)} control trials for Layer {layer}.")
+    if not status_queue: print(f"Generated {len(work_items)} random control trials for Layer {layer} (Strengths: {strengths}, Trials/Strength: {n_trials}).")
     
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -215,7 +221,7 @@ def main():
 
     model_name_clean = args.model.replace("/", "_").replace("-", "_").replace(".", "_")
     base_path = f"datasets/concepts_nnsight/{model_name_clean.lower()}"
-    output_dir = f"datasets/trials/{model_name_clean.lower()}"
+    output_dir = f"datasets/trials/{model_name_clean.lower()}/control"
     
     # Load Concepts (even though not injecting, we need structure/metadata compatibility)
     vectors, concepts, strengths = load_concepts(base_path)

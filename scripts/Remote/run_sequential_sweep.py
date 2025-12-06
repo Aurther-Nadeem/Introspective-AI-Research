@@ -20,7 +20,7 @@ from run_exp_a_nnsight import process_layer, ALL_CONCEPTS
 CONCEPTS = ALL_CONCEPTS
 STRENGTHS = [1, 2, 4, 8]  # Paper: [1, 2, 4, 8]
 N_TRIALS_EXP_A = 50
-N_TRIALS_CONTROL = 1
+N_TRIALS_CONTROL = 50
 
 def get_layers_for_model(model_name):
     if "70B" in model_name or "70b" in model_name:

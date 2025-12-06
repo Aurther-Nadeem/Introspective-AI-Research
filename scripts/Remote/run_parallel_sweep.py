@@ -10,9 +10,10 @@ from run_exp_a_nnsight import process_layer, ALL_CONCEPTS
 
 # Configuration
 CONCEPTS = ALL_CONCEPTS
-STRENGTHS = [1, 2, 4, 8]  # Paper uses [1, 2, 4, 8], no 16
-N_TRIALS_EXP_A = 50
-N_TRIALS_CONTROL = 1
+# Experiments Params (Paper: 50 trials per layer/strength, Strengths [1, 2, 4, 8])
+N_TRIALS = 50
+STRENGTHS = [1, 2, 4, 8]
+BATCH_SIZE = 128
 MODEL_NAME = "meta-llama/Llama-3.1-405B-Instruct"
 
 def worker_process(layer, batch_size, status_queue, exp_type, model_name):
@@ -40,7 +41,7 @@ def worker_process(layer, batch_size, status_queue, exp_type, model_name):
                 output_dir=output_dir,
                 concepts=concepts,
                 strengths=strengths, 
-                n_trials=N_TRIALS_EXP_A,
+                n_trials=N_TRIALS,
                 batch_size=batch_size,
                 status_queue=status_queue
             )
@@ -51,7 +52,7 @@ def worker_process(layer, batch_size, status_queue, exp_type, model_name):
                  output_dir=output_dir,
                  concepts=concepts,
                  strengths=strengths,
-                 n_trials=1, # 1 trial per combo (was 20, way too many!)
+                 n_trials=N_TRIALS,
                  batch_size=batch_size,
                  status_queue=status_queue
             )

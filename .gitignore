@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+*.jsonl
+datasets/trials/**/experiment/
+datasets/trials/**/control/
+datasets/trials/**/exp_a/

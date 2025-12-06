@@ -54,24 +54,27 @@ def process_layer(layer, model, model_name, concept_dir, output_dir, concepts, s
         return
 
     # 2. Generate Work Items
+    # 2. Work Items
+    # Protocol: 50 random trials per (Model, Strength, Layer)
+    import random
     work_items = []
     
-    # Base strengths
-    target_strengths = strengths 
+    valid_concepts = list(vectors.keys())
     
-    for concept in concepts:
-        if concept not in vectors: continue
-        all_s = [0] + strengths
-        for s in all_s:
-            for t in range(n_trials):
-                work_items.append({
-                    "concept": concept,
-                    "strength": s,
-                    "injected": (s > 0),
-                    "trial_idx": t
-                })
-                
-    if not status_queue: print(f"Generated {len(work_items)} trials for Layer {layer}.")
+    for s in strengths:
+        # 50 random trials per strength
+        for t in range(n_trials):
+            # Random sample
+            concept = random.choice(valid_concepts)
+            
+            work_items.append({
+                "concept": concept,
+                "strength": s,
+                "injected": (s > 0),
+                "trial_idx": t
+            })
+            
+    if not status_queue: print(f"Generated {len(work_items)} random trials for Layer {layer} (Strengths: {strengths}).")
     
     # 3. Batch Processing
     out_path = Path(output_dir)
@@ -129,10 +132,10 @@ Human: Ok, let's get started.
                             if item['strength'] == 0: continue
                             vec = vectors[item['concept']]
                             s = item['strength']
-                            if hidden.shape[1] > 1:
+                            if len(hidden.shape) == 3:
                                  hidden[i, injection_start_idx:, :] += vec.to(hidden.device).to(hidden.dtype) * s
-                            else:
-                                 hidden[i, :, :] += vec.to(hidden.device).to(hidden.dtype) * s
+                            elif len(hidden.shape) == 2:
+                                 hidden[i, :] += vec.to(hidden.device).to(hidden.dtype) * s
                                  
                         saved_output = model.generator.output.save()
                         
@@ -207,7 +210,7 @@ def main():
 
     model_name_clean = args.model.replace("/", "_").replace("-", "_").replace(".", "_")
     base_path = f"datasets/concepts_nnsight/{model_name_clean.lower()}"
-    output_dir = f"datasets/trials/{model_name_clean.lower()}"
+    output_dir = f"datasets/trials/{model_name_clean.lower()}/exp_a"
 
     # Load Concepts
     vectors, concepts, strengths = load_concepts(base_path)
